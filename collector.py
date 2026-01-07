@@ -1,7 +1,7 @@
 import os
 import json
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 # 데이터 저장 파일명
 DATA_FILE = "data.json"
@@ -14,7 +14,6 @@ def get_fred_yield():
     if not api_key:
         return None
     
-    # 최신 1건만 조회
     url = f"https://api.stlouisfed.org/fred/series/observations?series_id=DGS30&api_key={api_key}&file_type=json&sort_order=desc&limit=1"
     
     try:
@@ -40,17 +39,13 @@ def get_usd_krw():
         print("Error: BOK_API_KEY not found.")
         return None
 
-    # [날짜 로직]
-    # 오늘이 주말이거나 공휴일, 혹은 아직 장 마감 전일 수 있으므로
-    # '오늘'만 조회하면 데이터가 없을 수 있습니다.
-    # 따라서 '7일 전'부터 '오늘'까지를 조회한 뒤 가장 마지막(최신) 값을 씁니다.
-    today = datetime.now()
-    end_date = today.strftime("%Y%m%d")                  # 오늘
-    start_date = (today - timedelta(days=7)).strftime("%Y%m%d")  # 7일 전
+    # 한국 시간 기준 '오늘'을 구하기 위해 UTC+9 적용
+    kst_timezone = timezone(timedelta(hours=9))
+    today = datetime.now(timezone.utc).astimezone(kst_timezone)
     
-    # https://getidiom.com/dictionary/korean/%EA%B5%AC%EC%84%B1
-    # 사용자가 제공한 731Y001 코드 적용.
-    # 파싱 편의를 위해 /xml/ 대신 /json/을 사용합니다.
+    end_date = today.strftime("%Y%m%d")
+    start_date = (today - timedelta(days=7)).strftime("%Y%m%d")
+    
     url = f"https://ecos.bok.or.kr/api/StatisticSearch/{api_key}/json/kr/1/10/731Y001/D/{start_date}/{end_date}/0000001"
     
     try:
@@ -58,18 +53,10 @@ def get_usd_krw():
         response.raise_for_status()
         data = response.json()
         
-        # 응답 구조 확인 및 데이터 추출
         if 'StatisticSearch' in data and 'row' in data['StatisticSearch']:
             rows = data['StatisticSearch']['row']
-            # 기간 내 데이터 중 가장 마지막(최신) 항목 선택
-            last_item = rows[-1] 
-            
+            last_item = rows[-1]
             price = last_item['DATA_VALUE']
-            date = last_item['TIME']
-            
-            print(f"BOK Exchange Rate Date: {date}, Value: {price}") # 로그 확인용
-            
-            # 쉼표(,)가 포함된 문자열일 수 있으므로 제거 후 float 변환
             return float(price.replace(",", ""))
         else:
             print("BOK API Error: No data found in range.")
@@ -84,14 +71,22 @@ def main():
     us_30y = get_fred_yield()
     usd_krw = get_usd_krw()
 
-    # 2. JSON 구조 생성
+    # 2. 한국 시간(KST) 구하기
+    # UTC 현재 시간을 가져온 뒤 9시간을 더한 타임존으로 변환
+    kst_timezone = timezone(timedelta(hours=9))
+    now_kst = datetime.now(timezone.utc).astimezone(kst_timezone)
+    
+    # 예: "2026-01-07 09:33 (KST)"
+    updated_at_str = now_kst.strftime("%Y-%m-%d %H:%M") + " (KST)"
+
+    # 3. JSON 구조 생성
     data = {
-        "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "updated_at": updated_at_str,
         "us_30y": us_30y if us_30y else 0.0,
         "usd_krw": usd_krw if usd_krw else 0.0
     }
 
-    # 3. 파일 저장
+    # 4. 파일 저장
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False)
     
