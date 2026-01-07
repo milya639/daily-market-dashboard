@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard</title>
+    <style>
+        /* 미니멀리즘 스타일 */
+        body {
+            background-color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            color: #333;
+        }
+
+        /* 날짜 표시 영역 */
+        #timestamp {
+            font-size: 1.2rem;
+            color: #888;
+            margin-bottom: 40px;
+            font-weight: 300;
+        }
+
+        /* 메인 데이터 컨테이너 */
+        .metrics-container {
+            display: flex;
+            gap: 60px; /* 숫자 사이 간격 */
+            margin-bottom: 80px;
+        }
+
+        .metric {
+            font-size: 6rem; /* 아주 큰 폰트 */
+            font-weight: 700;
+            letter-spacing: -2px;
+            line-height: 1;
+        }
+
+        /* 금리 색상 (약간의 강조가 필요하다면 사용, 아니면 black) */
+        .yield { color: #333; }
+        
+        /* 환율 색상 */
+        .rate { color: #333; }
+
+        /* 바로가기 링크 영역 */
+        .shortcuts {
+            display: flex;
+            gap: 20px;
+        }
+
+        .shortcuts a {
+            text-decoration: none;
+            color: #555;
+            font-size: 1rem;
+            padding: 8px 16px;
+            border-radius: 20px;
+            background-color: #f1f3f4; /* 크롬 기본 바로가기 느낌 */
+            transition: background-color 0.2s;
+        }
+
+        .shortcuts a:hover {
+            background-color: #e8eaed;
+            color: #000;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="timestamp">Loading...</div>
+
+    <div class="metrics-container">
+        <div id="us-30y" class="metric yield">-</div>
+        <div id="usd-krw" class="metric rate">-</div>
+    </div>
+
+    <div class="shortcuts">
+        <a href="https://google.com">Google</a>
+        <a href="https://shopping.naver.com">Shopping</a>
+        <a href="https://dynalist.io">Dynalist</a>
+        <a href="https://namu.wiki">Namuwiki</a>
+        <a href="https://gemini.google.com">Gemini</a>
+    </div>
+
+    <script>
+        // 캐시 방지를 위해 현재 시간을 쿼리 스트링으로 추가
+        fetch('./data.json?t=' + new Date().getTime())
+            .then(response => response.json())
+            .then(data => {
+                // 1. 날짜 업데이트
+                document.getElementById('timestamp').innerText = data.updated_at;
+
+                // 2. 미국채 30년물 (예: 4.65%)
+                // 데이터가 0이거나 null이면 '-' 표시
+                if (data.us_30y) {
+                    document.getElementById('us-30y').innerText = data.us_30y + "%";
+                }
+
+                // 3. 환율 (예: 1445) - 소수점 버림(Math.floor), 화폐단위 없음
+                if (data.usd_krw) {
+                    document.getElementById('usd-krw').innerText = Math.floor(data.usd_krw);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                document.getElementById('timestamp').innerText = "Data Load Failed";
+            });
+    </script>
+</body>
+</html>
